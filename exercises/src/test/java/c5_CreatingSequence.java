@@ -1,6 +1,9 @@
 import org.junit.jupiter.api.*;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
 import java.time.Duration;
@@ -39,7 +42,7 @@ public class c5_CreatingSequence {
     @Test
     public void value_I_already_have_mono() {
         String valueIAlreadyHave = "value";
-        Mono<String> valueIAlreadyHaveMono = null; //todo: change this line only
+        Mono<String> valueIAlreadyHaveMono = Mono.just(valueIAlreadyHave); //todo: change this line only
 
         StepVerifier.create(valueIAlreadyHaveMono)
                     .expectNext("value")
@@ -52,7 +55,7 @@ public class c5_CreatingSequence {
     @Test
     public void potentially_null_mono() {
         String potentiallyNull = null;
-        Mono<String> potentiallyNullMono = null; //todo change this line only
+        Mono<String> potentiallyNullMono = Mono.justOrEmpty(potentiallyNull); //todo change this line only
 
         StepVerifier.create(potentiallyNullMono)
                     .verifyComplete();
@@ -64,7 +67,7 @@ public class c5_CreatingSequence {
     @Test
     public void optional_value() {
         Optional<String> optionalValue = Optional.of("optional");
-        Mono<String> optionalMono = null; //todo: change this line only
+        Mono<String> optionalMono = Mono.justOrEmpty(optionalValue); //todo: change this line only
 
         StepVerifier.create(optionalMono)
                     .expectNext("optional")
@@ -82,7 +85,7 @@ public class c5_CreatingSequence {
             return callableCounter.incrementAndGet();
         };
 
-        Mono<Integer> callableCounterMono = null; //todo: change this line only
+        Mono<Integer> callableCounterMono = Mono.fromCallable(callable); //todo: change this line only
 
         StepVerifier.create(callableCounterMono.repeat(2))
                     .expectNext(1, 2, 3)
@@ -99,7 +102,7 @@ public class c5_CreatingSequence {
             System.out.println("You are incrementing a counter via Future!");
             return futureCounter.incrementAndGet();
         });
-        Mono<Integer> futureCounterMono = null; //todo: change this line only
+        Mono<Integer> futureCounterMono = Mono.fromFuture(completableFuture); //todo: change this line only
 
         StepVerifier.create(futureCounterMono)
                     .expectNext(1)
@@ -116,7 +119,7 @@ public class c5_CreatingSequence {
             runnableCounter.incrementAndGet();
             System.out.println("You are incrementing a counter via Runnable!");
         };
-        Mono<Integer> runnableMono = null; //todo: change this line only
+        Mono<Integer> runnableMono = Mono.fromRunnable(runnable); //todo: change this line only
 
         StepVerifier.create(runnableMono.repeat(2))
                     .verifyComplete();
@@ -129,7 +132,7 @@ public class c5_CreatingSequence {
      */
     @Test
     public void acknowledged() {
-        Mono<String> acknowledged = null; //todo: change this line only
+        Mono<String> acknowledged = Mono.empty(); //todo: change this line only
 
         StepVerifier.create(acknowledged)
                     .verifyComplete();
@@ -140,7 +143,7 @@ public class c5_CreatingSequence {
      */
     @Test
     public void seen() {
-        Mono<String> seen = null; //todo: change this line only
+        Mono<String> seen = Mono.never(); //todo: change this line only
 
         StepVerifier.create(seen.timeout(Duration.ofSeconds(5)))
                     .expectSubscription()
@@ -153,7 +156,7 @@ public class c5_CreatingSequence {
      */
     @Test
     public void trouble_maker() {
-        Mono<String> trouble = null; //todo: change this line
+        Mono<String> trouble = Mono.error(IllegalStateException::new); //todo: change this line
 
         StepVerifier.create(trouble)
                     .expectError(IllegalStateException.class)
@@ -166,7 +169,7 @@ public class c5_CreatingSequence {
     @Test
     public void from_array() {
         Integer[] array = {1, 2, 3, 4, 5};
-        Flux<Integer> arrayFlux = null; //todo: change this line only
+        Flux<Integer> arrayFlux = Flux.fromArray(array); //todo: change this line only
 
         StepVerifier.create(arrayFlux)
                     .expectNext(1, 2, 3, 4, 5)
@@ -179,7 +182,7 @@ public class c5_CreatingSequence {
     @Test
     public void from_list() {
         List<String> list = Arrays.asList("1", "2", "3", "4", "5");
-        Flux<String> listFlux = null; //todo: change this line only
+        Flux<String> listFlux =Flux.fromIterable(list); //todo: change this line only
 
         StepVerifier.create(listFlux)
                     .expectNext("1", "2", "3", "4", "5")
@@ -192,7 +195,7 @@ public class c5_CreatingSequence {
     @Test
     public void from_stream() {
         Stream<String> stream = Stream.of("5", "6", "7", "8", "9");
-        Flux<String> streamFlux = null; //todo: change this line only
+        Flux<String> streamFlux = Flux.fromStream(stream); //todo: change this line only
 
         StepVerifier.create(streamFlux)
                     .expectNext("5", "6", "7", "8", "9")
@@ -204,7 +207,7 @@ public class c5_CreatingSequence {
      */
     @Test
     public void interval() {
-        Flux<Long> interval = null; //todo: change this line only
+        Flux<Long> interval = Flux.interval(Duration.ofSeconds(1)); //todo: change this line only
 
         System.out.println("Interval: ");
         StepVerifier.create(interval.take(3).doOnNext(System.out::println))
@@ -222,7 +225,7 @@ public class c5_CreatingSequence {
      */
     @Test
     public void range() {
-        Flux<Integer> range = null; //todo: change this line only
+        Flux<Integer> range = Flux.range(-5, 11); //todo: change this line only
 
         System.out.println("Range: ");
         StepVerifier.create(range.doOnNext(System.out::println))
@@ -237,7 +240,9 @@ public class c5_CreatingSequence {
     @Test
     public void repeat() {
         AtomicInteger counter = new AtomicInteger(0);
-        Flux<Integer> repeated = null; //todo: change this line
+        Callable<Integer> callable = counter::incrementAndGet;
+
+        Flux<Integer> repeated = Mono.fromCallable(callable).repeat(9); //todo: change this line
 
         System.out.println("Repeat: ");
         StepVerifier.create(repeated.doOnNext(System.out::println))
@@ -250,25 +255,39 @@ public class c5_CreatingSequence {
      * more complex scenarios when we tackle backpressure.
      *
      * Answer:
-     * - What is difference between `generate` and `create`?
-     * - What is difference between `create` and `push`?
+     * - What is difference between `generate` and `create`? - generate is sync, but the create is Async
+     * - What is difference between `create` and `push`? - push is able to proceed only with on Thread
      */
     @Test
     public void generate_programmatically() {
+        AtomicInteger counterForGenerate = new AtomicInteger(0);
+        AtomicInteger counterForCreate = new AtomicInteger(0);
+        AtomicInteger counterForPush = new AtomicInteger(0);
 
         Flux<Integer> generateFlux = Flux.generate(sink -> {
+            sink.next(counterForGenerate.incrementAndGet());
+            if (counterForGenerate.get() == 5) sink.complete();
             //todo: fix following code so it emits values from 0 to 5 and then completes
         });
 
         //------------------------------------------------------
 
         Flux<Integer> createFlux = Flux.create(sink -> {
-            //todo: fix following code so it emits values from 0 to 5 and then completes
+                    for (int i = 1; i <= 5; i++) {
+                        sink.next(i);
+                    }
+                    sink.complete();
         });
 
         //------------------------------------------------------
 
         Flux<Integer> pushFlux = Flux.push(sink -> {
+
+            for (int i = 1; i <= 5; i++) {
+                sink.next(i);
+            }
+            sink.complete();
+
             //todo: fix following code so it emits values from 0 to 5 and then completes
         });
 
@@ -291,7 +310,7 @@ public class c5_CreatingSequence {
     @Test
     public void multi_threaded_producer() {
         //todo: find a bug and fix it!
-        Flux<Integer> producer = Flux.push(sink -> {
+        Flux<Integer> producer = Flux.create(sink -> {
             for (int i = 0; i < 100; i++) {
                 int finalI = i;
                 new Thread(() -> sink.next(finalI)).start(); //don't change this line!
