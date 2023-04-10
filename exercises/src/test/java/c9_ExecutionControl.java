@@ -6,13 +6,16 @@ import reactor.core.Exceptions;
 import reactor.core.Scannable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.ParallelFlux;
 import reactor.core.scheduler.NonBlocking;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
+import reactor.util.function.Tuple2;
 
 import java.time.Duration;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -48,6 +51,7 @@ public class c9_ExecutionControl extends ExecutionControlBase {
         long threadId = Thread.currentThread().getId();
         Flux<String> notifications = readNotifications()
                 .doOnNext(System.out::println)
+                .delayElements(Duration.ofSeconds(1))
                 //todo: change this line only
                 ;
 
@@ -77,8 +81,11 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     public void ready_set_go() {
         //todo: feel free to change code as you need
         Flux<String> tasks = tasks()
-                .flatMap(Function.identity());
-        semaphore();
+                .concatMap(e -> e.delaySubscription(semaphore()));
+
+        //flatMap() -> use then you don't care about order of call and output ordering in sequence
+        //flatMapSequential() -> use then you don't care about order of call, but you do need ordering in output sequence
+        //concatMap() -> use then you do care about order of call, and you do need ordering in output sequence
 
         //don't change code below
         StepVerifier.create(tasks)
@@ -93,9 +100,13 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     /**
      * Make task run on thread suited for short, non-blocking, parallelized work.
      * Answer:
-     * - Which types of schedulers Reactor provides?
-     * - What is their purpose?
-     * - What is their difference?
+     * - Which types of schedulers Reactor provides? -> immediate, single, boundElastic, parallel
+     * - What is their purpose? -> create scheduling responsibilities to manage thread as it ExecutorService does
+     * - What is their difference? ->
+     *              immediate: without context, runs in the same thread,
+     *              single: create a single reusable thread(to create new thread after each task use newSingle())
+     *              boundElastic: has number of threads equal 10xCPUcores. Each blocking call has it own thread
+     *              parallel: has number of threads equal CPUcores
      */
     @Test
     public void non_blocking() {
@@ -104,9 +115,12 @@ public class c9_ExecutionControl extends ExecutionControlBase {
                                   assert NonBlocking.class.isAssignableFrom(Thread.currentThread().getClass());
                                   System.out.println("Task executing on: " + currentThread.getName());
                               })
-                              //todo: change this line only
+                              .subscribeOn(Schedulers.parallel())
                               .then();
-
+//              immediate: without context, runs in the same thread,
+//              single: create a single reusable thread(to create new thread after each task use newSingle())
+//              boundElastic: has number of threads equal 10xCPUcores. Each blocking call has it own thread
+//              parallel: has number of threads equal CPUcores
         StepVerifier.create(task)
                     .verifyComplete();
     }
@@ -114,14 +128,14 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     /**
      * Make task run on thread suited for long, blocking, parallelized work.
      * Answer:
-     * - What BlockHound for?
+     * - What BlockHound for? -> to prevent and detect blocking calls. If blocking call an error will be thrown?
      */
     @Test
     public void blocking() {
         BlockHound.install(); //don't change this line
 
         Mono<Void> task = Mono.fromRunnable(ExecutionControlBase::blockingCall)
-                              .subscribeOn(Schedulers.single())//todo: change this line only
+                              .subscribeOn(Schedulers.boundedElastic())//todo: change this line only
                               .then();
 
         StepVerifier.create(task)
@@ -134,10 +148,12 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     @Test
     public void free_runners() {
         //todo: feel free to change code as you need
-        Mono<Void> task = Mono.fromRunnable(ExecutionControlBase::blockingCall);
+        Mono<Void> task = Mono.fromRunnable(ExecutionControlBase::blockingCall)
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
 
         Flux<Void> taskQueue = Flux.just(task, task, task)
-                                   .concatMap(Function.identity());
+                .flatMap(Function.identity(), 3);
 
         //don't change code below
         Duration duration = StepVerifier.create(taskQueue)
@@ -154,7 +170,8 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     public void sequential_free_runners() {
         //todo: feel free to change code as you need
         Flux<String> tasks = tasks()
-                .flatMap(Function.identity());
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMapSequential(Function.identity());
         ;
 
         //don't change code below
@@ -176,9 +193,12 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     public void event_processor() {
         //todo: feel free to change code as you need
         Flux<String> eventStream = eventProcessor()
+                .parallel(3)
+                .runOn(Schedulers.parallel())
                 .filter(event -> event.metaData.length() > 0)
                 .doOnNext(event -> System.out.println("Mapping event: " + event.metaData))
                 .map(this::toJson)
+                .sequential()
                 .concatMap(n -> appendToStore(n).thenReturn(n));
 
         //don't change code below
