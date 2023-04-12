@@ -1,8 +1,10 @@
 import org.junit.jupiter.api.*;
 import org.reactivestreams.Subscription;
+import reactor.core.Disposable;
 import reactor.core.Exceptions;
 import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.test.StepVerifier;
 import reactor.test.StepVerifierOptions;
 
@@ -47,6 +49,7 @@ public class c10_Backpressure extends BackpressureBase {
     public void request_and_demand() {
         CopyOnWriteArrayList<Long> requests = new CopyOnWriteArrayList<>();
         Flux<String> messageStream = messageStream1()
+                .doOnRequest(requests::add)
                 //todo: change this line only
                 ;
 
@@ -71,6 +74,8 @@ public class c10_Backpressure extends BackpressureBase {
     public void limited_demand() {
         CopyOnWriteArrayList<Long> requests = new CopyOnWriteArrayList<>();
         Flux<String> messageStream = messageStream2()
+                .doOnRequest(requests::add)
+                .limitRate(1)
                 //todo: do your changes here
                 ;
 
@@ -94,7 +99,10 @@ public class c10_Backpressure extends BackpressureBase {
     @Test
     public void uuid_generator() {
         Flux<UUID> uuidGenerator = Flux.create(sink -> {
-            //todo: do your changes here
+            long requested = sink.requestedFromDownstream();
+            for (int i = 0; i < requested; i++) {
+                sink.next(UUID.randomUUID());
+            }
         });
 
         StepVerifier.create(uuidGenerator
@@ -116,6 +124,7 @@ public class c10_Backpressure extends BackpressureBase {
     @Test
     public void pressure_is_too_much() {
         Flux<String> messageStream = messageStream3()
+                .onBackpressureError()
                 //todo: change this line only
                 ;
 
@@ -137,6 +146,7 @@ public class c10_Backpressure extends BackpressureBase {
     @Test
     public void u_wont_brake_me() {
         Flux<String> messageStream = messageStream4()
+                .onBackpressureBuffer()
                 //todo: change this line only
                 ;
 
@@ -173,6 +183,7 @@ public class c10_Backpressure extends BackpressureBase {
                     //todo: do your changes only within BaseSubscriber class implementation
                     @Override
                     protected void hookOnSubscribe(Subscription subscription) {
+                        request(10);
                         sub.set(subscription);
                     }
 
@@ -180,6 +191,9 @@ public class c10_Backpressure extends BackpressureBase {
                     protected void hookOnNext(String s) {
                         System.out.println(s);
                         count.incrementAndGet();
+                        if (count.get() == 10) {
+                            sub.get().cancel();
+                        }
                     }
                     //-----------------------------------------------------
                 });
