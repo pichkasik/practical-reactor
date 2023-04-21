@@ -1,5 +1,6 @@
 import org.junit.jupiter.api.*;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
 import java.util.Arrays;
@@ -32,6 +33,7 @@ public class c12_Broadcasting extends BroadcastingBase {
     @Test
     public void sharing_is_caring() throws InterruptedException {
         Flux<Message> messages = messageStream()
+                .publish().refCount(2)
                 //todo: do your changes here
                 ;
 
@@ -56,10 +58,14 @@ public class c12_Broadcasting extends BroadcastingBase {
      * Since two subscribers are interested in the updates, which are coming from same source, convert `updates` stream
      * to from cold to hot source.
      * Answer: What is the difference between hot and cold publisher? Why does won't .share() work in this case?
+     * cold - proceed with published events when subscribed
+     * hot - allowing to proceed on the moment of publisher, there is no demand to have a subscription
+     * .share() won't work since at least one subscription has to be presented
      */
     @Test
     public void hot_vs_cold() {
         Flux<String> updates = systemUpdates()
+                .publish().autoConnect()
                 //todo: do your changes here
                 ;
 
@@ -72,6 +78,9 @@ public class c12_Broadcasting extends BroadcastingBase {
         StepVerifier.create(updates.take(4).doOnNext(n -> System.out.println("subscriber 2 got: " + n)))
                     .expectNext("DISK_SPACE_LOW", "OOM_DETECTED", "CRASHED", "UNKNOWN")
                     .verifyComplete();
+
+        System.out.println("Subscribe");
+        updates.subscribe(System.out::println);
     }
 
     /**
@@ -82,6 +91,7 @@ public class c12_Broadcasting extends BroadcastingBase {
     @Test
     public void history_lesson() {
         Flux<String> updates = systemUpdates()
+                .replay().autoConnect()
                 //todo: do your changes here
                 ;
 
